@@ -490,6 +490,13 @@ void modelMatrix::saveToFile(const string filePath) const
 	nzModelDataset.write(&nz, H5::PredType::NATIVE_UINT);
 	nzModelDataset.close();
 
+	// nZSir
+	H5::DataSpace mspaceNZsir(1, &col_dims);
+	H5::DataSet nzSirDataset = file.createDataSet(
+		"nzSir", H5::PredType::NATIVE_UINT, mspaceNZsir);
+	nzSirDataset.write(&nzSir, H5::PredType::NATIVE_UINT);
+	nzSirDataset.close();
+
 	// rRes
 	H5::DataSpace mspaceRRes(1, &col_dims);
 	H5::DataSet rResDataset = file.createDataSet(
@@ -525,13 +532,21 @@ void modelMatrix::saveToFile(const string filePath) const
 	z0Dataset.write(&z0, H5::PredType::NATIVE_FLOAT);
 	z0Dataset.close();
 
-	// data
+	// data (actual model matrix)
 	const hsize_t col_data = nElements;
 	H5::DataSpace mspaceData(1, &col_data);
 	H5::DataSet dataDataset = file.createDataSet(
 		"data", H5::PredType::NATIVE_FLOAT, mspaceData);
 	dataDataset.write(data, H5::PredType::NATIVE_FLOAT);
 	dataDataset.close();
+
+	// also export spatial impulse response [isir, ir, iz]
+	const hsize_t col_datasir = nr * nz * nzSir;
+	H5::DataSpace mspaceSir(1, &col_datasir);
+	H5::DataSet sirDataset = file.createDataSet(
+		"sir", H5::PredType::NATIVE_FLOAT, mspaceSir);
+	sirDataset.write(sir, H5::PredType::NATIVE_FLOAT);
+	sirDataset.close();
 
 	file.close();
 	vprintf("done!\n", 0);
