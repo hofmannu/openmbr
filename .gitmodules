@@ -1,3 +1,0 @@
-[submodule "lib/vtkwriter"]
-	path = lib/vtkwriter
-	url = git@github.com:hofmannu/vtkwriter.git

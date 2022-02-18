@@ -1,4 +1,0 @@
-[submodule "GUI/lib/vtkwriter"]
-	path = GUI/lib/vtkwriter
-	url = git@github.com:hofmannu/vtkwriter.git
-	update = merge
