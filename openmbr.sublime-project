@@ -1,0 +1,16 @@
+{
+	"build_systems": [
+		{
+			"name": "Default openmbr build",
+			"shell": true,
+			"cmd": "cmake .. && make all && ctest",
+			"working_dir": "${project_path}/Debug"
+		}
+	],
+	"folders":
+	[
+		{
+			"path": "."
+		}
+	]
+}
