@@ -3,6 +3,7 @@
 
 void recon::crop()
 {
+	statusVerbal = "Cropping signal matrix...";
 	// for now we only "crop" along time direction
 	const uint64_t tStartVol = sigMat.get_idx(sett.get_tMin(), 2);
 	const uint64_t tStopVol = sigMat.get_idx(sett.get_tMax(), 2);
@@ -13,9 +14,9 @@ void recon::crop()
 
 	// crop signal matrix to correct t range
 	croppedSigMat = sigMat;
-	printf("range t: %lu ... %lu\n", tStartVol, tStopVol);
 	croppedSigMat.crop(startIdxSig, stopIdxSig);
 
+	statusVerbal = "Cropping model matrix...";
 	// order t, x, y, z
 	const uint64_t tStartMod = mod.get_tIdx(sett.get_tMin());
 	const uint64_t tStopMod = tStartMod + nt - 1;
@@ -25,15 +26,17 @@ void recon::crop()
 	// crop model matrix to correct range
 	croppedMod = mod;
 	croppedMod.crop(startIdxMod, stopIdxMod);
-	croppedMod.print_information();
 
 	return;
 }
 
 void recon::lsqr()
 {
+	statusVerbal = "Preparing variables for LSQR...";
 	// here we load our mbr_transsym with all the important details
 	absMat.set_dim(croppedSigMat.get_dim(0), croppedSigMat.get_dim(1), croppedMod.get_nz());
+	absMat.alloc_memory();
+
 	kernel.set_sizeAbsMat(absMat.get_dim(0), absMat.get_dim(1), absMat.get_dim(2)); // nx, ny, nz
 	kernel.set_sizeSigMat(
 		croppedSigMat.get_dim(0), croppedSigMat.get_dim(1), croppedSigMat.get_dim(2)); // nx, ny, nt
@@ -55,6 +58,7 @@ void recon::lsqr()
 	u.normalize();
 	
 	// r = A' * croppedVol.data
+	statusVerbal = "Running first transpose multiplication...";
 	kernel.set_absMat(r.get_pdata());
 	kernel.set_sigMat(u.get_pdata());
 	kernel.run_trans();
@@ -70,8 +74,10 @@ void recon::lsqr()
 
 	w = v;
 
-	for (uint8_t iIter = 0; iIter < sett.get_nIter(); iIter++){
-		printf("Running iteration %d of %d...\n", iIter + 1, sett.get_nIter());
+	for (uint8_t iIter = 0; iIter < sett.get_nIter(); iIter++)
+	{
+		statusVerbal = "Running iteration " + std::to_string(iIter + 1) + " of " + 
+			std::to_string(sett.get_nIter());
 		
 		// *iterator = iIter;
 		
@@ -109,7 +115,8 @@ void recon::lsqr()
 		wWeighted *= (pow(sett.get_regStrength(), 2.0f) / beta);
 		// wWeighted = v * lambda^2 / norm_p
 
-		r += wWeighted; // r = r + wWeighted 
+		r += wWeighted; // r = r + wWeighted
+		printf("Norm after iteration %d: %f\n", iIter, r.get_norm());
 		
 		// r = ATu - norm_p .* v
 		v *= beta; // v = v * norm_p
@@ -142,9 +149,32 @@ void recon::lsqr()
 		wWeighted *= (theta / rrho);
 		w = v;
 		w -= wWeighted;
-
 	}
-  isRecon = 1; // indicate that reconstruction is done
+  absMat = recon; // assign volume to output
+	return;
+}
+
+// main reconstruction loop. this will later allow distinguishing between different
+// inversion schemes
+void recon::reconstruct()
+{
+	tStart = std::chrono::system_clock::now();
+	isRunning = 1;
+	crop();
+	lsqr();
+	absMat.calcMinMax();
+	tEnd = std::chrono::system_clock::now();
+	reconTime = duration_cast<seconds>(tEnd - tStart).count();
+	
+	statusVerbal = "reconstruction done";
+	isRunning = 0;
+	isRecon = 1;
 
 	return;
+}
+
+// this should run our reconstruction in a detached thread
+std::thread recon::reconstruct2thread()
+{
+	return std::thread([=] { reconstruct();} );
 }

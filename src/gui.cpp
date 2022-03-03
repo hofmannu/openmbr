@@ -92,12 +92,14 @@ void gui::init(int *argcp, char**argv)
 
 void gui::MainDisplayCode()
 {
-	SettingsWindow();
-	ModelWindow();
-	DataLoader();
+	SettingsWindow(); // settings for reconstruction
+	ModelWindow(); // model loading and preview
+	DataLoader(); // loading and previewing signal matrix
+	ReconPreview(); // small preview window for reconstructed datasets
+	return;
 }
 
-
+// all the settings of the reconstruction
 void gui::SettingsWindow()
 {
 	ImGui::Begin("Reconstruction settings");
@@ -154,16 +156,55 @@ void gui::SettingsWindow()
 
 	ImGui::NextColumn();
 	ImGui::Columns(1);
-	if (ImGui::Button("Reconstruct"))
+
+	if (rec.get_isRunning())
 	{
-		rec.crop();
-		rec.lsqr();
-	};
+		ImGui::Text("Reconstruction currently running");
+		ImGui::Columns(2);
+		const time_t tt = system_clock::to_time_t(rec.get_tStart());
+		ImGui::Text("Start time"); ImGui::NextColumn(); 
+		ImGui::Text("%s", ctime(&tt)); ImGui::NextColumn();
+		ImGui::Text("Status"); ImGui::NextColumn();
+		ImGui::Text("%s", rec.get_statusVerbal()); ImGui::NextColumn();
+		ImGui::Columns(1);
+	}
+	else
+	{
+		if (isReconRunning) 
+		{
+			// if we get here the reconstruction just finished
+			reconThread.join();
+			isReconRunning = 0;
+		}
+		else
+		{
+			if (!(isSigMatLoaded && mod->get_isLoaded()))
+			{
+				ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+		    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+			}
+
+			if (ImGui::Button("Reconstruct"))
+			{
+				isReconRunning = 1;
+				recon* recPtr = &rec;
+				reconThread = recPtr->reconstruct2thread();
+			};
+
+			if (!(isSigMatLoaded && mod->get_isLoaded()))
+			{
+				ImGui::PopItemFlag();
+	    	ImGui::PopStyleVar();
+			}
+		}
+
+	}
 
 	ImGui::End();
 	return;
 }
 
+// interfacing with the model matrix
 void gui::ModelWindow()
 {
 	ImGui::Begin("Model matrix");
@@ -263,6 +304,7 @@ void gui::ModelWindow()
 	return;
 }
 
+// small helper to load and preview raw data
 void gui::DataLoader()
 {
 	ImGui::Begin("Data loader");
@@ -308,7 +350,7 @@ void gui::DataLoader()
 			ImGui::NextColumn();
 
 			ImGui::Text("Size [x, y, t]"); ImGui::NextColumn();
-					ImGui::Text("%i x %i x %i", 
+					ImGui::Text("%lu x %lu x %lu", 
 				sigMat->get_dim(0), 
 				sigMat->get_dim(1), 
 				sigMat->get_dim(2)); 
@@ -410,5 +452,51 @@ void gui::ImImagesc(
 	// give pointer back to main program
 	*out_texture = image_texture;
 	delete[] data_conv; // free memory for temporary array
+	return;
+}
+
+void gui::ReconPreview()
+{
+	if (rec.get_isRecon())
+	{
+		ImGui::Begin("Reconstruction result");
+
+		// preview of resulting dataset
+		if (ImGui::CollapsingHeader("Slicer"))
+		{
+			ImGui::SliderInt("tSlice", &absSliceZ, 0, absMat->get_dim(2) - 1);
+			const float zSlice = absMat->get_pos(absSliceZ, 2);
+			ImGui::Text("Current z layer: %f mm", zSlice * 1e3f);
+			ImImagesc(absMat->get_psliceZ((uint64_t) absSliceZ),
+				absMat->get_dim(0), absMat->get_dim(1), &absDataTexture, absDataMapper);
+			
+			int width = 550;
+			int height = (float) width / absMat->get_length(0) * absMat->get_length(1);
+			ImGui::Image((void*)(intptr_t)absDataTexture, ImVec2(width, height));
+			
+			ImGui::SliderInt("xSlice", &absSliceY, 0, absMat->get_dim(0) - 1);
+
+			ImImagesc(absMat->get_psliceY((uint64_t) absSliceY),
+			 	absMat->get_dim(0), absMat->get_dim(2), &absDataTextureSlice, absDataMapper);
+			height = (float) width / absMat->get_length(0) * absMat->get_length(2);
+			ImGui::Image((void*)(intptr_t)absDataTextureSlice, ImVec2(width, height));
+			
+			ImGui::SliderFloat("MinVal", absDataMapper.get_pminVal(), 
+				absMat->get_minVal(), absMat->get_maxVal(), "%.1f");
+			ImGui::SliderFloat("MaxVal", absDataMapper.get_pmaxVal(), 
+				absMat->get_minVal(), absMat->get_maxVal(), "%.1f");
+			ImGui::ColorEdit4("Min color", absDataMapper.get_pminCol(), 
+				ImGuiColorEditFlags_Float);
+			ImGui::ColorEdit4("Max color", absDataMapper.get_pmaxCol(), 
+				ImGuiColorEditFlags_Float);
+		}
+
+		if (ImGui::CollapsingHeader("Export"))
+		{
+
+		}
+
+		ImGui::End();
+	}
 	return;
 }

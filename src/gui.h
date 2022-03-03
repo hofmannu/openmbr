@@ -29,18 +29,21 @@ private:
 	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 0.10f); // bg color
 
 	recon rec;
-	reconsett* sett;
-	model* mod;
+	reconsett* sett; // pointer to reconstruction settings
+	model* mod; //
 	volume* absMat;
 	volume* sensField;
 
 	volume* sigMat;
-	bool isSigMatLoaded = 0;
+	bool isSigMatLoaded = 0; // is the signal matrix loaded and ready?
+	bool isReconRunning = 0; // is a reconstruction currently in progress?
+	bool isReconDone = 0; // do we have a reconstructed volume to display and export?
 
 	void MainDisplayCode();
 	void SettingsWindow();
 	void ModelWindow();
 	void DataLoader();
+	void ReconPreview();
 
 	void ImImagesc(const float* data, const uint64_t sizex, const uint64_t sizey, 
 	GLuint* out_texture, const color_mapper myCMap);
@@ -60,6 +63,15 @@ private:
 	color_mapper modDataMapper;
 	GLuint modDataTexture;
 	GLuint modDataTextureSlice;
+
+	// for model vizualization
+	int absSliceZ = 0;
+	int absSliceY = 0;
+	color_mapper absDataMapper;
+	GLuint absDataTexture;
+	GLuint absDataTextureSlice;
+
+	std::thread reconThread; // separate thread in which we will run the reconstruction
 
 public:
 	gui();

@@ -171,14 +171,13 @@ mbr_transsym::~mbr_transsym()
 
 void mbr_transsym::run_trans()
 {
+	// printf("Dimensions:\n");
+	// printf(" - nxScan, nyScan: %lu x %lu \n", nxScan, nyScan);
+	// printf(" - nxModel, nyModel: %lu x %lu \n", nxModel, nyModel);
+	// printf(" - nt: %lu \n", nt);
+	// printf(" - nz: %lu \n", nz);
 
-	printf("Dimensions:\n");
-	printf(" - nxScan, nyScan: %lu x %lu \n", nxScan, nyScan);
-	printf(" - nxModel, nyModel: %lu x %lu \n", nxModel, nyModel);
-	printf(" - nt: %lu \n", nt);
-	printf(" - nz: %lu \n", nz);
-
-	printf("Array sizes");
+	// printf("Array sizes");
 
 	// allocate memory on GPU
 	cudaErr = cudaMalloc((void**) &modelMat_dev, get_nBytesModel());
