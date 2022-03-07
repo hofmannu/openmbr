@@ -29,8 +29,10 @@ private:
 	float res[4] = {4e-9, 20e-6, 20e-6, 20e-6}; // resolution of model [dt, dx, dy, dz]
 	float origin[4] = {0.0, -1e-3, -1e-3, -1e-3}; // origin of model vectot [t0, x0, y0, z0]
 	uint64_t dim[4] = {200, 101, 101, 101}; // size of model matrix: [nt, nx, ny, nz]
-
 	bool isLoaded = 0; // is model loaded?
+	string filePath; // from where do we load the model
+	float minVal = 0;
+	float maxVal = 0;
 
 	void alloc_model();
 
@@ -44,8 +46,11 @@ public:
 
 	void crop(const uint64_t* startIdx, const uint64_t* stopIdx);
 
+	void load_from_file(); // use existing filepath to load model
 	void load_from_file(const string _filePath);
+
 	void calc_sensField();
+	void calc_minmax();
 
 	float* get_pdata() {return modelData;};
 	inline float get_val(
@@ -88,7 +93,11 @@ public:
 
 	inline uint64_t get_nElements() const {return dim[0] * dim[1] * dim[2] * dim[3];}; 
 
+	inline float get_minVal() const {return minVal;};
+	inline float get_maxVal() const {return maxVal;};
+
 	bool get_isLoaded() const {return isLoaded;};
+	const char* get_filePath() const {return filePath.c_str();};
 
 	void print_information();
 

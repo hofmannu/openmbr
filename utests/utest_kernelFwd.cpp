@@ -4,11 +4,11 @@ int main()
 {
 	srand(1);
 
-	const uint64_t nt = 301;
-	const uint64_t nz = 201;
-	const uint64_t nxModel = 11;
-	const uint64_t nx = 201;
-	const uint64_t ny = 101;
+	const uint64_t nt = 111;
+	const uint64_t nz = 101;
+	const uint64_t nxModel = 31;
+	const uint64_t nx = 501;
+	const uint64_t ny = 201;
 
 	mbr_transsym myKernel;
 

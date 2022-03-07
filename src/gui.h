@@ -8,6 +8,9 @@
 #include <thread>
 #include <ctime>
 #include <chrono>
+#include <cuda_runtime.h>
+#include <cuda.h>
+
 
 #include "../lib/imgui/imgui.h"
 #include "imgui_impl_sdl.h"
@@ -20,6 +23,8 @@
 #include "model.h"
 #include "color_mapper.h"
 #include "../lib/CVolume/src/volume.h"
+#include "gpu_info.h"
+
 
 class gui
 {
@@ -30,20 +35,31 @@ private:
 
 	recon rec;
 	reconsett* sett; // pointer to reconstruction settings
-	model* mod; //
-	volume* absMat;
-	volume* sensField;
+	model* mod; // model matrix used for iterative inversion
+	volume* absMat; // absorbance matrix
+	volume* sensField; // sensitivity field of transducer (for plotting)
+
+	gpu_info ginfo;
 
 	volume* sigMat;
 	bool isSigMatLoaded = 0; // is the signal matrix loaded and ready?
 	bool isReconRunning = 0; // is a reconstruction currently in progress?
-	bool isReconDone = 0; // do we have a reconstructed volume to display and export?
 
 	void MainDisplayCode();
 	void SettingsWindow();
 	void ModelWindow();
 	void DataLoader();
 	void ReconPreview();
+	void SystemInformation();
+
+	inline void AbortButton();
+	inline void ReconButton();
+
+	inline void LoadDataButton();
+	inline void ReloadDataButton();
+
+	inline void LoadModelButton();
+	inline void ReloadModelButton();
 
 	void ImImagesc(const float* data, const uint64_t sizex, const uint64_t sizey, 
 	GLuint* out_texture, const color_mapper myCMap);
@@ -72,10 +88,11 @@ private:
 	GLuint absDataTextureSlice;
 
 	std::thread reconThread; // separate thread in which we will run the reconstruction
+	bool canRecon();
+	void boolIndicator(const bool status);
 
 public:
 	gui();
-
 	void init(int *argcp, char**argv);
 
 };

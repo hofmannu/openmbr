@@ -118,7 +118,6 @@ uint64_t model::get_tIdx(const float tPos) const
 
 
 // here come all other fancy functions
-
 void model::calc_sensField()
 {
 	sensField.set_dim(get_nx(), get_ny(), get_nz());
@@ -146,7 +145,22 @@ void model::calc_sensField()
 	return;
 }
 
-
+// calculates the minimum and maximum value of the entire model matrix
+void model::calc_minmax()
+{
+	minVal = modelData[0];
+	maxVal = modelData[0];
+	const uint64_t nElements = get_nElements(); 
+	for (uint64_t iElem = 0; iElem < nElements; iElem++)
+	{
+		if (modelData[iElem] > maxVal)
+			maxVal = modelData[iElem];
+		
+		if (modelData[iElem] < minVal)
+			minVal = modelData[iElem];
+	}
+	return;
+}
 
 void model::alloc_model()
 {
@@ -159,9 +173,18 @@ void model::alloc_model()
 	return;
 }
 
-// load model matrix from an h5 file, careful with data order here!!!
-void model::load_from_file(const string filePath)
+// load model from default file path
+void model::load_from_file(const string _filePath)
 {
+	filePath = _filePath;
+	load_from_file();
+	return;
+}
+
+// load model matrix from an h5 file, careful with data order here!!!
+void model::load_from_file()
+{
+
 	H5::H5File file(filePath, H5F_ACC_RDONLY);
 
 	H5::DataSet resDataset = file.openDataSet("dr"); // init dataset for res 

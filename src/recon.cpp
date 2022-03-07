@@ -55,19 +55,18 @@ void recon::lsqr()
 	// normalize signal matrix
 	u = croppedSigMat;
 	float beta = u.get_norm();
-	u.normalize();
+	u /= beta;
 	
 	// r = A' * croppedVol.data
 	statusVerbal = "Running first transpose multiplication...";
-	kernel.set_absMat(r.get_pdata());
-	kernel.set_sigMat(u.get_pdata());
-	kernel.run_trans();
+	kernel.set_sigMat(u.get_pdata()); // set input pointer
+	kernel.set_absMat(r.get_pdata()); // output pointer
+	kernel.run_trans(); // run transpose multiplication
 
-	recon = 0.0f;
+	recon = 0.0f; // set absorbance matrix initially to all 0
 	float alpha = r.get_norm();
 	
-	v = r;
-	v /= alpha; // v = r / alpa
+	v = r; v /= alpha; // v = r / alpa
 
 	float phi_bar = beta;
 	float rho_bar = alpha;
@@ -79,64 +78,56 @@ void recon::lsqr()
 		statusVerbal = "Running iteration " + std::to_string(iIter + 1) + " of " + 
 			std::to_string(sett.get_nIter());
 		
-		// *iterator = iIter;
-		
 		// bidiagonalization 
 		// p = A * v - alpha * u
 		// p = A * v;
-		kernel.set_absMat(v.get_pdata());
-		kernel.set_sigMat(p.get_pdata());
-		kernel.run_fwd();
+		kernel.set_absMat(v.get_pdata()); // set input pointer
+		kernel.set_sigMat(p.get_pdata()); // set output pointer
+		kernel.run_fwd(); // afterwards: p = A * v
 
 		u *= alpha; // u = u * alpha
-		p -= u; // p = p - u
-
-		beta = p.get_norm();
+		p -= u; // p = p - u (--> p = A * v - u * alpha)
 
 		// determine beta
 		// beta = sqrt(beta^2 + (norm(lambda .* v(:)))^2);
+		// note: norm(lambda .* v(:)) is the same as lambda * norm(v(:))
 		beta = p.get_norm();
-		beta = pow(beta, 2.0f);
-		wWeighted =  v;
-		v *= sett.get_regStrength(); // wWeighted = v * lambda
-		float norm_p_reg = wWeighted.get_norm(); // norm(wWeighted)
-		norm_p_reg = pow(norm_p_reg, 2.0f); 
-		beta = pow(beta + norm_p_reg, 0.5f);
-	
-		u = p;
-		u /= beta;
+		// const float vNorm = v.get_norm();
+		// const float vNormWeighted = vNorm * sett.get_regStrength();
+		// beta = powf(beta * beta + vNormWeighted * vNormWeighted, 0.5f);
+		
+		u = p; 	u /= beta; // u = p / beta
 
 		// r = A' * u - beta * v;
-		kernel.set_sigMat(u.get_pdata());
-		kernel.set_absMat(r.get_pdata());
+		kernel.set_sigMat(u.get_pdata()); // set input pointer
+		kernel.set_absMat(r.get_pdata()); // set output pointer
 		kernel.run_trans(); // r = A' * u
 
 		wWeighted = v;
-		wWeighted *= (pow(sett.get_regStrength(), 2.0f) / beta);
+		wWeighted *= (-1.0f * beta);
 		// wWeighted = v * lambda^2 / norm_p
 
 		r += wWeighted; // r = r + wWeighted
-		printf("Norm after iteration %d: %f\n", iIter, r.get_norm());
 		
 		// r = ATu - norm_p .* v
-		v *= beta; // v = v * norm_p
-		r -= v; // r = r - v
+		// v *= beta; // v = v * norm_p
+		// r -= v; // r = r - v
 
 		alpha = r.get_norm(); // alpha = norm(r);
-		
-		v = r;
-		r /= alpha;
+		v = r; v /= alpha; // v = r / alpha
 		
 		// % ------------- orthogonal transformation ---------------
 		// rrho = norm([rho_bar, beta]);
-		float rrho = rho_bar * rho_bar + beta * beta;
-		rrho = pow(rrho, 0.5);
-		float c1 = rho_bar / rrho;
-		float s1 = beta / rrho;
-		float theta = s1 * alpha;
+		const float rrho = powf(rho_bar * rho_bar + beta * beta, 0.5f);
+		const float c1 = rho_bar / rrho;
+		const float s1 = beta / rrho;
+		const float theta = s1 * alpha;
 		rho_bar = -c1 * alpha;
-		float phi = c1 * phi_bar;
+		const float phi = c1 * phi_bar;
 		phi_bar = s1 * phi_bar;
+
+		printf("Phi bar after iteration %d: %f\n", iIter + 1, phi_bar);
+		phi_bar_vec.push_back(phi_bar);
 
 		// update solution and search direction
 		// x = x + (phi / rrho) * w
@@ -147,10 +138,17 @@ void recon::lsqr()
 		// w = v - (theta / rrho) * w;
 		wWeighted = w;
 		wWeighted *= (theta / rrho);
-		w = v;
-		w -= wWeighted;
+		w = v; w -= wWeighted;
+		
+		if (flagAbort)
+			break;
+
+		// update absMat after each iteration to preview stuff in GUI
+  	absMat = recon; 
+  	absMat.calcMinMax();
+
 	}
-  absMat = recon; // assign volume to output
+
 	return;
 }
 
@@ -158,8 +156,11 @@ void recon::lsqr()
 // inversion schemes
 void recon::reconstruct()
 {
-	tStart = std::chrono::system_clock::now();
+	flagAbort = 0;
 	isRunning = 1;
+	phi_bar_vec.clear();
+
+	tStart = std::chrono::system_clock::now();
 	crop();
 	lsqr();
 	absMat.calcMinMax();
@@ -176,5 +177,12 @@ void recon::reconstruct()
 // this should run our reconstruction in a detached thread
 std::thread recon::reconstruct2thread()
 {
+	isRunning = 1;
 	return std::thread([=] { reconstruct();} );
+}
+
+void recon::set_flagAbort(const bool _flagAbort)
+{
+	flagAbort = _flagAbort;
+	return;
 }

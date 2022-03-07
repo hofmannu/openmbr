@@ -1,5 +1,21 @@
 #include "gui.h"
 
+
+// displays a small help marker next to the text
+static void HelpMarker(const char* desc)
+{
+	ImGui::TextDisabled("(?)");
+	if (ImGui::IsItemHovered())
+	{
+		ImGui::BeginTooltip();
+		ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+		ImGui::TextUnformatted(desc);
+		ImGui::PopTextWrapPos();
+		ImGui::EndTooltip();
+	}
+	return;
+}
+
 gui::gui()
 {
 	sett = rec.get_psett();
@@ -96,77 +112,136 @@ void gui::MainDisplayCode()
 	ModelWindow(); // model loading and preview
 	DataLoader(); // loading and previewing signal matrix
 	ReconPreview(); // small preview window for reconstructed datasets
+	SystemInformation();
 	return;
 }
 
 // all the settings of the reconstruction
 void gui::SettingsWindow()
 {
-	ImGui::Begin("Reconstruction settings");
+	ImGui::Begin("Reconstruction");
 
-	float regStength = sett->get_regStrength();
-	ImGui::InputFloat("Reg strength", &regStength);
-	sett->set_regStrength(regStength);
-
-	int nIter = sett->get_nIter();
-	ImGui::InputInt("Number of iterations", &nIter);
-	sett->set_nIter(nIter);
-
-	vector3<float> dr = sett->get_dr() * 1e6f;
-	ImGui::InputFloat3("Resolution of output [microm]", &dr.x);
-	sett->set_dr(dr * 1e-6);
-
-	vector3<float> startPos = sett->get_startPos() * 1e3f;
-	ImGui::InputFloat3("MinPos [mm]", &startPos.x);
-	sett->set_startPos(startPos * 1e-3);
-
-	vector3<float> endPos = sett->get_endPos() * 1e3f;
-	ImGui::InputFloat3("MaxPos [mm]", &endPos.x);
-	sett->set_endPos(endPos * 1e-3);
-
-	float tLim[2] = {sett->get_tMin() * 1e6f, sett->get_tMax() * 1e6f}; 
-	ImGui::InputFloat2("tLim [micros]", tLim);
-	sett->set_tMin(tLim[0] * 1e-6f);
-	sett->set_tMax(tLim[1] * 1e-6f);
-
-	ImGui::Columns(2);
-	ImGui::Text("Model loaded?"); ImGui::NextColumn();
-
-	if (mod->get_isLoaded())
+	// here the user can define all important reconstruction settings
+	if (ImGui::CollapsingHeader("Settings"))
 	{
-		ImGui::Text("y");
-	}
-	else
-	{
-		ImGui::Text("n");
+		float regStength = sett->get_regStrength();
+		ImGui::InputFloat("Reg strength", &regStength);
+		sett->set_regStrength(regStength);
+		ImGui::SameLine();
+		HelpMarker("Defines the regularization strength applied during inversion. Noise free datasets can run with 0 regularization, noisy datasets typically require a value around 5");
 
+		int nIter = sett->get_nIter();
+		ImGui::InputInt("Number of iterations", &nIter);
+		sett->set_nIter(nIter);
+		ImGui::SameLine();
+		HelpMarker("The inversion runs iteratively. With each iteration of the LSQR, the result should converge a bit more towards the true solution. Typically more iterations will result in a more accuracte result but require more time to be calculated.");
+
+		vector3<float> dr = sett->get_dr() * 1e6f;
+		ImGui::InputFloat3("Resolution of output [microm]", &dr.x);
+		sett->set_dr(dr * 1e-6);
+
+		vector3<float> startPos = sett->get_startPos() * 1e3f;
+		ImGui::InputFloat3("MinPos [mm]", &startPos.x);
+		sett->set_startPos(startPos * 1e-3);
+
+		vector3<float> endPos = sett->get_endPos() * 1e3f;
+		ImGui::InputFloat3("MaxPos [mm]", &endPos.x);
+		sett->set_endPos(endPos * 1e-3);
+
+		float tLim[2] = {sett->get_tMin() * 1e6f, sett->get_tMax() * 1e6f}; 
+		ImGui::InputFloat2("tLim [micros]", tLim);
+		sett->set_tMin(tLim[0] * 1e-6f);
+		sett->set_tMax(tLim[1] * 1e-6f);
 	}
 
-	ImGui::NextColumn();
-	ImGui::Text("Data loaded?"); ImGui::NextColumn();
-	if (isSigMatLoaded)
+	if (ImGui::CollapsingHeader("Program status"))
 	{
-		ImGui::Text("y");
-	}
-	else
-	{
-		ImGui::Text("n");
 
-	}
+		ImGui::Columns(2);
 
-	ImGui::NextColumn();
-	ImGui::Columns(1);
+		// check if the model was loaded
+		ImGui::Text("Model loaded?"); 
+		ImGui::SameLine();
+		HelpMarker("To run a reconstruction, you first need to load a valid model from a file using the model matrix interface.");
+		ImGui::NextColumn();
+		boolIndicator(mod->get_isLoaded());
+		ImGui::NextColumn();
+
+		// check if the dataset was loaded from the harddrive
+		ImGui::Text("Data loaded?"); 
+		ImGui::SameLine();
+		HelpMarker("To run a reconstruction, you first need to load a dataset from a h5 file using the data loader interface.");
+		ImGui::NextColumn();
+		boolIndicator(isSigMatLoaded);
+		ImGui::NextColumn();
+
+		// check if the GPU was detected properly
+		ImGui::Text("GPU detected?");
+		ImGui::SameLine();
+		HelpMarker("The reconstruction runs on a GPU and we therefore need to find at least one CUDA capable device on your machine.");
+		ImGui::NextColumn();
+		boolIndicator(ginfo.get_nGpus() > 0);
+		ImGui::NextColumn();
+
+		ImGui::Text("Reconstruction running?");
+		ImGui::SameLine();
+		HelpMarker("This indicator will switch to true in the moment we start our reconstruction. The process will run in a separate thread so that the GUI can stay responsive.");
+		ImGui::NextColumn();
+		boolIndicator(rec.get_isRunning());
+		ImGui::NextColumn();
+
+		ImGui::Text("Abort request?");
+		ImGui::SameLine();
+		HelpMarker("If the user send a request to abort the execution of the current reconstruction, this will turn to true.");
+		ImGui::NextColumn();
+		boolIndicator(rec.get_flagAbort());
+		ImGui::Columns(1);
+	}
 
 	if (rec.get_isRunning())
 	{
-		ImGui::Text("Reconstruction currently running");
+		if (ImGui::CollapsingHeader("Reconstruction status"))
+		{
+			ImGui::Columns(2);
+			// start time of reconstruction
+			const time_t tt = system_clock::to_time_t(rec.get_tStart());
+			ImGui::Text("Start time");
+			ImGui::NextColumn(); 
+			ImGui::Text("%s", ctime(&tt));
+			ImGui::NextColumn();
+			
+			// elapsed time since start
+			ImGui::Text("Elapsed time");
+			ImGui::NextColumn();
+
+			ImGui::NextColumn();
+
+			// current iteration
+			ImGui::Text("Iteration");
+			ImGui::NextColumn();
+			ImGui::Text("%d / %d", rec.get_iIter(), sett->get_nIter());
+			ImGui::NextColumn();
+			
+			ImGui::Text("Convergence");
+			ImGui::NextColumn();
+			if (rec.get_iIter() > 1)
+			{
+				ImGui::Text("%.2f", rec.get_relConvergence());
+			}
+			else
+			{
+				ImGui::Text("-");
+			}
+			
+			ImGui::NextColumn();
+			ImGui::Text("Status"); 
+			ImGui::NextColumn();
+			ImGui::Text("%s", rec.get_statusVerbal());
+
+			ImGui::Columns(1);
+		}
 		ImGui::Columns(2);
-		const time_t tt = system_clock::to_time_t(rec.get_tStart());
-		ImGui::Text("Start time"); ImGui::NextColumn(); 
-		ImGui::Text("%s", ctime(&tt)); ImGui::NextColumn();
-		ImGui::Text("Status"); ImGui::NextColumn();
-		ImGui::Text("%s", rec.get_statusVerbal()); ImGui::NextColumn();
-		ImGui::Columns(1);
+		
 	}
 	else
 	{
@@ -176,42 +251,146 @@ void gui::SettingsWindow()
 			reconThread.join();
 			isReconRunning = 0;
 		}
-		else
-		{
-			if (!(isSigMatLoaded && mod->get_isLoaded()))
-			{
-				ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
-		    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
-			}
-
-			if (ImGui::Button("Reconstruct"))
-			{
-				isReconRunning = 1;
-				recon* recPtr = &rec;
-				reconThread = recPtr->reconstruct2thread();
-			};
-
-			if (!(isSigMatLoaded && mod->get_isLoaded()))
-			{
-				ImGui::PopItemFlag();
-	    	ImGui::PopStyleVar();
-			}
-		}
-
 	}
+
+	ImGui::Columns(2);
+	ReconButton();
+	ImGui::NextColumn();
+
+	// add a button to stop a runing reconstruction
+	AbortButton();
+	ImGui::NextColumn();
 
 	ImGui::End();
 	return;
 }
 
-// interfacing with the model matrix
-void gui::ModelWindow()
+// a button to start a reconstruction which is either active or inactive
+inline void gui::ReconButton()
 {
-	ImGui::Begin("Model matrix");
+	// add a button to start a reconstruction
+	const bool flagCanRecon = canRecon();
+	if (!flagCanRecon)
+	{
+		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+	}
+
+	if (ImGui::Button("Reconstruct"))
+	{
+		isReconRunning = 1;
+		recon* recPtr = &rec;
+		reconThread = recPtr->reconstruct2thread();
+	}
+
+	if (!flagCanRecon)
+	{
+		ImGui::PopItemFlag();
+  	ImGui::PopStyleVar();
+	}
+	return;
+}
+
+// an abort button to stop reconstruction after the next iteration (clean exit)
+inline void gui::AbortButton()
+{
+	const bool enableAbortButton = rec.get_isRunning() && (!rec.get_flagAbort());
+	if (!enableAbortButton)
+	{
+		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+	}
+
+	if (ImGui::Button("Terminate"))
+	{
+		rec.set_flagAbort(1);	
+	}
+
+	if (!enableAbortButton)
+	{
+		ImGui::PopItemFlag();
+  	ImGui::PopStyleVar();
+	}
+
+	ImGui::SameLine();
+	HelpMarker("Abort the currently running reconstruction after finishing the next iteration through the LSQR. Could take a bit of time after requesting abort.");
+	return;
+}
+
+// some infos about the workstation
+void gui::SystemInformation()
+{
+	ImGui::Begin("System information");
+	if (ImGui::CollapsingHeader("GPU"))
+	{
+		ImGui::Columns(2);
+		for (int iGpu = 0; iGpu < ginfo.get_nGpus(); iGpu++)
+		{
+			const cudaDeviceProp* currProps = ginfo.get_props(iGpu);
+			
+			// device name
+			ImGui::Text("Device name");
+			ImGui::NextColumn();
+			ImGui::Text("%s", currProps->name);
+			ImGui::NextColumn();
+
+			ImGui::Text("Total global memory [Gb]");
+			ImGui::NextColumn();
+			ImGui::Text("%lu", currProps->totalGlobalMem / (1024 * 1024 * 1024));
+			ImGui::NextColumn();
+
+			ImGui::Text("Clock rate [GHz]");
+			ImGui::NextColumn();
+			ImGui::Text("%.2f", (float) currProps->clockRate / (1024.0f * 1024.0f));
+			ImGui::NextColumn();
+
+			ImGui::Text("Number of multiprocessors [1]");
+			ImGui::NextColumn();
+			ImGui::Text("%d", currProps->multiProcessorCount);
+			ImGui::NextColumn();
+
+			ImGui::Text("Warp size [1]");
+			ImGui::NextColumn();
+			ImGui::Text("%d", currProps->warpSize);
+			ImGui::NextColumn();
+
+			ImGui::Text("Memory clock rate [GHz]");
+			ImGui::NextColumn();
+			ImGui::Text("%.2f", ((float) currProps->memoryClockRate) / (1024.0f * 1024.0f));
+			ImGui::NextColumn();
+		
+			ImGui::Text("Memory Bus Width [bits]");
+			ImGui::NextColumn();
+			ImGui::Text("%d", currProps->memoryBusWidth);
+			ImGui::NextColumn();
+
+
+			const int pmb = 2.0*currProps->memoryClockRate*(currProps->memoryBusWidth/8)/1.0e6;
+			ImGui::Text("Peak Memory Bandwidth [GB/s]");
+			ImGui::NextColumn();
+			ImGui::Text("%d", pmb);
+			ImGui::NextColumn();
+
+
+		}
+		ImGui::Columns(1);
+	}
+
+	if (ImGui::CollapsingHeader("Host"))
+	{
+
+	}
+	ImGui::End();
+	return;
+}
+
+// button to load the model matrix from a file
+inline void gui::LoadModelButton()
+{
 	if (ImGui::Button("Load from file"))
 	{
 		ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", 
-			"Choose File", ".h5\0", ".");
+			"Choose model matrix file", ".h5\0", ".");
 	}
 
 	if (ImGuiFileDialog::Instance()->FileDialog("ChooseFileDlgKey")) 
@@ -221,6 +400,7 @@ void gui::ModelWindow()
 			std::string inputFilePath = ImGuiFileDialog::Instance()->GetFilepathName();
 			mod->load_from_file(inputFilePath);
 			mod->calc_sensField();
+			mod->calc_minmax();
 
 			if (mod->get_tEnd() < sett->get_tMax())
 			{
@@ -234,6 +414,57 @@ void gui::ModelWindow()
 		}
 		ImGuiFileDialog::Instance()->CloseDialog("ChooseFileDlgKey");
 	}
+	return;
+}
+
+// make a button to reload model from the same file once we did the first loading
+inline void gui::ReloadModelButton()
+{
+	if (!mod->get_isLoaded())
+	{
+		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+	}
+
+	if (ImGui::Button("Reload"))
+	{
+		mod->load_from_file();
+		mod->calc_sensField();
+		mod->calc_minmax();
+
+		if (mod->get_tEnd() < sett->get_tMax())
+		{
+			sett->set_tMax(mod->get_tEnd());
+		}
+
+		if (mod->get_t0() > sett->get_tMin())
+		{
+			sett->set_tMin(mod->get_t0());
+		}
+	}
+
+	if (!mod->get_isLoaded())
+	{
+		ImGui::PopItemFlag();
+  	ImGui::PopStyleVar();
+	}
+
+	return;
+}
+
+// interfacing with the model matrix
+void gui::ModelWindow()
+{
+	ImGui::Begin("Model matrix");
+	ImGui::Columns(2);
+
+	LoadModelButton();
+	ImGui::NextColumn();
+
+	ReloadModelButton();
+	ImGui::NextColumn();
+	ImGui::Columns(1);
+
 	
 	if (mod->get_isLoaded())
 	{
@@ -241,6 +472,11 @@ void gui::ModelWindow()
 		if (ImGui::CollapsingHeader("Model information"))
 		{
 			ImGui::Columns(2);
+			ImGui::Text("File path");
+			ImGui::NextColumn();
+			ImGui::Text("%s", mod->get_filePath());
+			ImGui::NextColumn();
+
 			// display resolution of dataset
 			ImGui::Text("Resolution [x, y, z, t]");
 			ImGui::NextColumn();
@@ -268,6 +504,11 @@ void gui::ModelWindow()
 			ImGui::NextColumn();
 			ImGui::Text("%lu, %lu, %lu, %lu", 
 				mod->get_nx(), mod->get_ny(), mod->get_nz(), mod->get_nt());		
+			ImGui::NextColumn();
+
+			ImGui::Text("Data range");
+			ImGui::NextColumn();
+			ImGui::Text("%.2f ... %.2f", mod->get_minVal(), mod->get_maxVal());
 			ImGui::NextColumn();
 
 			ImGui::Columns(1);
@@ -308,35 +549,15 @@ void gui::ModelWindow()
 void gui::DataLoader()
 {
 	ImGui::Begin("Data loader");
-	if (ImGui::Button("Load input data"))
-	{
-		ImGuiFileDialog::Instance()->OpenDialog("testmeow", 
-			"Choose File", ".h5\0", ".");
-	}
+	ImGui::Columns(2);
 
-	if (ImGuiFileDialog::Instance()->FileDialog("testmeow")) 
-	{
-		if (ImGuiFileDialog::Instance()->IsOk == true)
-		{
-			std::string inputFilePath = ImGuiFileDialog::Instance()->GetFilepathName();
-			sigMat->readFromFile(inputFilePath);
-			sigMat->calcMinMax();
+	LoadDataButton(); // button to load a new dataset from a file
+	ImGui::NextColumn();
+	
+	ReloadDataButton(); // button to reload dataset from disc
+	ImGui::NextColumn();
 
-			if (sigMat->get_maxPos(2) < sett->get_tMax())
-			{
-				sett->set_tMax(sigMat->get_maxPos(2));
-			}
-
-			if (sigMat->get_minPos(2) > sett->get_tMin())
-			{
-				sett->set_tMin(sigMat->get_minPos(2));
-			}
-
-			isSigMatLoaded = 1;
-		}
-		ImGuiFileDialog::Instance()->CloseDialog("testmeow");
-	}
-
+	ImGui::Columns(1);
 
 	if (isSigMatLoaded)
 	{
@@ -349,11 +570,14 @@ void gui::DataLoader()
 			ImGui::Text("%s", filePath.c_str());
 			ImGui::NextColumn();
 
-			ImGui::Text("Size [x, y, t]"); ImGui::NextColumn();
-					ImGui::Text("%lu x %lu x %lu", 
-				sigMat->get_dim(0), 
-				sigMat->get_dim(1), 
-				sigMat->get_dim(2)); 
+			ImGui::Text("Size [x, y, t]"); 
+			ImGui::NextColumn();
+			ImGui::Text("%lu x %lu x %lu", sigMat->get_dim(0), sigMat->get_dim(1), sigMat->get_dim(2)); 
+			ImGui::NextColumn();
+
+			ImGui::Text("Memory [Mb]"); 
+			ImGui::NextColumn();
+			ImGui::Text("%f", (float) sigMat->get_nElements() * sizeof(float) / (1024.0f * 1024.0f));
 			ImGui::NextColumn();
 
 			ImGui::Text("Resolution [microm, x, y]"); ImGui::NextColumn();
@@ -384,23 +608,26 @@ void gui::DataLoader()
 				sigMat->get_maxPos(1) * 1e3f);
 			ImGui::NextColumn();
 
-			ImGui::Text("Maximum value"); ImGui::NextColumn();
-			ImGui::Text("%.2f", sigMat->get_minVal());
+			ImGui::Text("Value range"); 
+			ImGui::NextColumn();
+			ImGui::Text("%.2f ... %.2f", sigMat->get_minVal(), sigMat->get_maxVal());
 			ImGui::NextColumn();
 
-			ImGui::Text("Minimum value"); ImGui::NextColumn();
-			ImGui::Text("%.2f", sigMat->get_maxVal());
-			ImGui::NextColumn();
 			ImGui::Columns(1);
 		}
 		
-
 		if (ImGui::CollapsingHeader("Dataset preview"))
 		{
 			ImGui::SliderInt("tSlice", &currSliceZ, 0, sigMat->get_dim(2) - 1);
+			
+			ImGui::Columns(2);
 			float tSlice = sigMat->get_pos(currSliceZ, 2);
-			ImGui::Text("Time of current layer: %f micros", tSlice * 1e6);
-			ImGui::Text("Approximated z layer: %f mm", tSlice * sett->get_sos());
+			ImGui::Text("tLayer: %.2f micros", tSlice * 1e6);
+			ImGui::NextColumn();
+			ImGui::Text("zLayer: %.2f mm", tSlice * sett->get_sos() * 1e3);
+			ImGui::NextColumn();
+
+			ImGui::Columns(1);
 			ImImagesc(sigMat->get_psliceZ((uint64_t) currSliceZ),
 				sigMat->get_dim(0), sigMat->get_dim(1), &inDataTexture, inDataMapper);
 			
@@ -408,7 +635,7 @@ void gui::DataLoader()
 			int height = (float) width / sigMat->get_length(0) * sigMat->get_length(1);
 			ImGui::Image((void*)(intptr_t)inDataTexture, ImVec2(width, height));
 			
-			ImGui::SliderInt("xSlice", &currSliceY, 0, sigMat->get_dim(0) - 1);
+			ImGui::SliderInt("xSlice", &currSliceY, 0, sigMat->get_dim(1) - 1);
 
 			ImImagesc(sigMat->get_psliceY((uint64_t) currSliceY),
 			 	sigMat->get_dim(0), sigMat->get_dim(2), &inDataTextureSlice, inDataMapper);
@@ -423,6 +650,74 @@ void gui::DataLoader()
 	}
 
 	ImGui::End();
+	return;
+}
+
+// a small button to reload the previously loaded dataset from file
+inline void gui::ReloadDataButton()
+{
+	if (!isSigMatLoaded)
+	{
+		ImGui::PushItemFlag(ImGuiItemFlags_Disabled, true);
+    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.5f);
+	}
+
+	if (ImGui::Button("Reload"))
+	{
+		sigMat->readFromFile();
+		sigMat->calcMinMax();
+
+			if (sigMat->get_maxPos(2) < sett->get_tMax())
+			{
+				sett->set_tMax(sigMat->get_maxPos(2));
+			}
+
+			if (sigMat->get_minPos(2) > sett->get_tMin())
+			{
+				sett->set_tMin(sigMat->get_minPos(2));
+			}
+	}
+
+	if (!isSigMatLoaded)
+	{
+		ImGui::PopItemFlag();
+  	ImGui::PopStyleVar();
+	}
+	ImGui::SameLine();
+	HelpMarker("Will reload the file from the same location as initially specified");
+	return;
+}
+
+inline void gui::LoadDataButton()
+{
+	if (ImGui::Button("Load input data"))
+	{
+		ImGuiFileDialog::Instance()->OpenDialog("fileDialogDataLoader", 
+			"Choose input dataset", ".h5\0", ".");
+	}
+
+	if (ImGuiFileDialog::Instance()->FileDialog("fileDialogDataLoader")) 
+	{
+		if (ImGuiFileDialog::Instance()->IsOk == true)
+		{
+			std::string inputFilePath = ImGuiFileDialog::Instance()->GetFilepathName();
+			sigMat->readFromFile(inputFilePath);
+			sigMat->calcMinMax();
+
+			if (sigMat->get_maxPos(2) < sett->get_tMax())
+			{
+				sett->set_tMax(sigMat->get_maxPos(2));
+			}
+
+			if (sigMat->get_minPos(2) > sett->get_tMin())
+			{
+				sett->set_tMin(sigMat->get_minPos(2));
+			}
+
+			isSigMatLoaded = 1;
+		}
+		ImGuiFileDialog::Instance()->CloseDialog("fileDialogDataLoader");
+	}
 	return;
 }
 
@@ -457,8 +752,10 @@ void gui::ImImagesc(
 
 void gui::ReconPreview()
 {
-	if (rec.get_isRecon())
+	if (rec.get_iIter() > 1)
 	{
+		absDataMapper.set_minVal(absMat->get_minVal());
+		absDataMapper.set_maxVal(absMat->get_maxVal());
 		ImGui::Begin("Reconstruction result");
 
 		// preview of resulting dataset
@@ -498,5 +795,26 @@ void gui::ReconPreview()
 
 		ImGui::End();
 	}
+	return;
+}
+
+bool gui::canRecon()
+{
+	bool canRecon = 
+		isSigMatLoaded && // data matrix needs to be loaded into file
+		mod->get_isLoaded() && // model matrix needs to be loaded
+		!isReconRunning && // there should not be any reconstruction running
+		(ginfo.get_nGpus() > 0); // we need at least one valid GPU
+	return canRecon;
+}
+
+// indicator if a bool is true or not. for now just a y n decision
+void gui::boolIndicator(const bool status)
+{
+	if (status)
+		ImGui::Text("y");
+	else
+		ImGui::Text("n");
+
 	return;
 }

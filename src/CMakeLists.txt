@@ -45,6 +45,7 @@ target_link_libraries(Gui PUBLIC
 	Recon
 	Volume
 	ColorMapper
+	GpuInfo
 	)
 set_property(TARGET Gui PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 
@@ -67,6 +68,8 @@ include_directories(${OPENGL_INCLUDE_DIRS})
 find_package(glfw3 REQUIRED)
 include_directories(${GLFW3_INCLUDE_DIR})
 link_libraries(${GLFW_LIBRARY_DIRS})
+
+add_library(GpuInfo gpu_info.cpp)
 
 add_library(MbrTranssym mbr_transsym.cu)
 set_property(TARGET MbrTranssym PROPERTY CUDA_SEPARABLE_COMPILATION ON)

@@ -10,7 +10,7 @@ int main()
 
 	reconsett* sett = rec.get_psett();
 	sett->set_regStrength(5.0f);
-	sett->set_nIter(1);
+	sett->set_nIter(20);
 	sett->set_tMin(4e-6f);
 	sett->set_tMax(7.34e-6f);
 
