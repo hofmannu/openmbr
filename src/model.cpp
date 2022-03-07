@@ -176,7 +176,7 @@ void model::alloc_model()
 // load model from default file path
 void model::load_from_file(const string _filePath)
 {
-	filePath = _filePath;
+	set_filePath(_filePath);
 	load_from_file();
 	return;
 }
@@ -184,7 +184,6 @@ void model::load_from_file(const string _filePath)
 // load model matrix from an h5 file, careful with data order here!!!
 void model::load_from_file()
 {
-
 	H5::H5File file(filePath, H5F_ACC_RDONLY);
 
 	H5::DataSet resDataset = file.openDataSet("dr"); // init dataset for res 
@@ -220,6 +219,23 @@ void model::load_from_file()
 	return;
 }
 
+void model::set_filePath(const string _filePath)
+{
+	filePath = _filePath;
+
+	// identify last "/" and cut string at that position
+	size_t found = filePath.find_last_of('/');
+	if (found == string::npos)
+	{	
+		printf("The path you specified seems to be invalid");
+		throw "InvalidPath";
+	}
+
+	folderPath = filePath.substr(0,found - 1);
+	fileName = filePath.substr(found + 1);
+	return;
+}
+
 inline float model::get_val(
 	const uint64_t idxX, const uint64_t idxY, 
 	const uint64_t idxT, const uint64_t idxZ) const
@@ -240,4 +256,11 @@ void model::print_information()
 		dim[0], dim[1], dim[2], dim[3]);
 
 	return;
+}
+
+// returns the memory required to store the entire model matrix
+float model::get_memory() const 
+{
+	const float memory = (float) get_nElements()  * sizeof(float); 
+	return memory;
 }

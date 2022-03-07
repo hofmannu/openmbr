@@ -44,7 +44,12 @@ void recon::lsqr()
 	kernel.set_modelMat(croppedMod.get_pdata());
 
 	volume r(absMat.get_dim(0), absMat.get_dim(1), absMat.get_dim(2));
+	
+	// prepare reconstruction matrix including origin and resolution
 	volume recon(absMat.get_dim(0), absMat.get_dim(1), absMat.get_dim(2));
+	recon.set_res(sigMat.get_res(0), sigMat.get_res(1), croppedMod.get_dz());
+	recon.set_origin(0.0f, 0.0f, croppedMod.get_z0());
+
 	volume v(absMat.get_dim(0), absMat.get_dim(1), absMat.get_dim(2));
 	volume w(absMat.get_dim(0), absMat.get_dim(1), absMat.get_dim(2));
 	volume wWeighted(absMat.get_dim(0), absMat.get_dim(1), absMat.get_dim(2));

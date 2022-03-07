@@ -213,7 +213,25 @@ void gui::SettingsWindow()
 			// elapsed time since start
 			ImGui::Text("Elapsed time");
 			ImGui::NextColumn();
-
+			const auto tCurr = std::chrono::system_clock::now();
+			std::chrono::duration<double> elapsed_seconds = tCurr - rec.get_tStart();
+			float elapsedSec = elapsed_seconds.count();
+			if (elapsedSec < 60.0f)
+				ImGui::Text("%.2f sec", elapsed_seconds.count());  
+			else if (elapsedSec < 3600.0f)
+			{
+				const int minCount = floor(elapsedSec / 60.0f);
+				elapsedSec -= (float) minCount * 60.0f;
+				ImGui::Text("%d min %.2f sec", minCount, elapsedSec);  
+			}
+			else
+			{
+				const int hourCount = floor(elapsedSec / 3600.0f);
+				elapsedSec -= (float) hourCount * 3600.0f;
+				const int minCount = floor(elapsedSec / 60.0f);
+				elapsedSec -= (float) minCount * 60.0f;
+				ImGui::Text("%d h %d min %.2f sec", hourCount, minCount, elapsedSec);  
+			}
 			ImGui::NextColumn();
 
 			// current iteration
@@ -465,16 +483,23 @@ void gui::ModelWindow()
 	ImGui::NextColumn();
 	ImGui::Columns(1);
 
-	
 	if (mod->get_isLoaded())
 	{
 		// some general informations about model size
 		if (ImGui::CollapsingHeader("Model information"))
 		{
 			ImGui::Columns(2);
+
+			// print path to folder where our model is stored
 			ImGui::Text("File path");
 			ImGui::NextColumn();
-			ImGui::Text("%s", mod->get_filePath());
+			ImGui::Text("%s", mod->get_folderPath());
+			ImGui::NextColumn();
+
+			// print name of file containing our model matrix
+			ImGui::Text("File name");
+			ImGui::NextColumn();
+			ImGui::Text("%s", mod->get_fileName());
 			ImGui::NextColumn();
 
 			// display resolution of dataset
@@ -493,6 +518,7 @@ void gui::ModelWindow()
 				mod->get_z0() * 1e3, mod->get_t0() * 1e6);
 			ImGui::NextColumn();
 
+			// end point of model
 			ImGui::Text("End [x, y, z, t]");
 			ImGui::NextColumn();
 			ImGui::Text("%.1f, %.1f, %.1f, %.1f", 
@@ -500,12 +526,20 @@ void gui::ModelWindow()
 				mod->get_zEnd() * 1e3, mod->get_tEnd() * 1e6);
 			ImGui::NextColumn();
 			
+			// print size of the model
 			ImGui::Text("Size [x, y, z, t]");
 			ImGui::NextColumn();
 			ImGui::Text("%lu, %lu, %lu, %lu", 
 				mod->get_nx(), mod->get_ny(), mod->get_nz(), mod->get_nt());		
 			ImGui::NextColumn();
 
+			// print memory that the model consumes
+			ImGui::Text("Memory [Mb]");
+			ImGui::NextColumn();
+			ImGui::Text("%.2f", mod->get_memory() / (1024.0f * 1024.0f));
+			ImGui::NextColumn();
+
+			// data range spanned by model
 			ImGui::Text("Data range");
 			ImGui::NextColumn();
 			ImGui::Text("%.2f ... %.2f", mod->get_minVal(), mod->get_maxVal());
@@ -521,7 +555,7 @@ void gui::ModelWindow()
 			ImImagesc(sensField->get_psliceZ((uint64_t) modSliceZ),
 				sensField->get_dim(0), sensField->get_dim(1), &modDataTexture, modDataMapper);
 			
-			int width = 400;
+			const int width = 400;
 			int height = (float) width / sensField->get_length(0) * sensField->get_length(1);
 			ImGui::Image((void*)(intptr_t)modDataTexture, ImVec2(width, height));
 			
@@ -538,8 +572,6 @@ void gui::ModelWindow()
 			ImGui::ColorEdit4("Max color", modDataMapper.get_pmaxCol(), ImGuiColorEditFlags_Float);
 		}
 	}
-
-
 
 	ImGui::End();
 	return;
@@ -754,34 +786,91 @@ void gui::ReconPreview()
 {
 	if (rec.get_iIter() > 1)
 	{
-		absDataMapper.set_minVal(absMat->get_minVal());
-		absDataMapper.set_maxVal(absMat->get_maxVal());
+		
 		ImGui::Begin("Reconstruction result");
 
-		// preview of resulting dataset
-		if (ImGui::CollapsingHeader("Slicer"))
+		if (ImGui::CollapsingHeader("Dataset information"))
 		{
-			ImGui::SliderInt("tSlice", &absSliceZ, 0, absMat->get_dim(2) - 1);
+			ImGui::Columns(2);
+
+			ImGui::Text("Size [x, y, t]"); 
+			ImGui::NextColumn();
+			ImGui::Text("%lu x %lu x %lu", absMat->get_dim(0), absMat->get_dim(1), absMat->get_dim(2)); 
+			ImGui::NextColumn();
+
+			ImGui::Text("Memory [Mb]"); 
+			ImGui::NextColumn();
+			ImGui::Text("%f", (float) absMat->get_nElements() * sizeof(float) / (1024.0f * 1024.0f));
+			ImGui::NextColumn();
+
+			ImGui::Text("Resolution [microm, x, y, z]"); ImGui::NextColumn();
+			ImGui::Text("%.2f x %.2f x %.2f", 
+				absMat->get_res(0) * 1e6f, 
+				absMat->get_res(1) * 1e6f, 
+				absMat->get_res(2) * 1e6f);
+			ImGui::NextColumn();
+			
+			ImGui::Text("x range [mm]"); ImGui::NextColumn();
+			ImGui::Text("%.2f ... %.2f", 
+				absMat->get_minPos(0) * 1e3f, 
+				absMat->get_maxPos(0) * 1e3f);
+			ImGui::NextColumn();
+
+			ImGui::Text("y range [mm]"); ImGui::NextColumn();
+			ImGui::Text("%.2f ... %.2f", 
+				absMat->get_minPos(1) * 1e3f, 
+				absMat->get_maxPos(1) * 1e3f);
+			ImGui::NextColumn();
+
+			ImGui::Text("z range [mm]"); ImGui::NextColumn();
+			ImGui::Text("%.2f ... %.2f", 
+				absMat->get_minPos(2) * 1e3f, 
+				absMat->get_maxPos(2) * 1e3f);
+			ImGui::NextColumn();
+
+			ImGui::Text("Value range"); 
+			ImGui::NextColumn();
+			ImGui::Text("%.2f ... %.2f", absMat->get_minVal(), absMat->get_maxVal());
+			ImGui::NextColumn();
+
+			ImGui::Columns(1);
+		}
+
+		// preview of resulting dataset
+		if (ImGui::CollapsingHeader("Reconstruction preview"))
+		{
+			ImGui::SliderInt("zSlice", &absSliceZ, 0, absMat->get_dim(2) - 1);
 			const float zSlice = absMat->get_pos(absSliceZ, 2);
-			ImGui::Text("Current z layer: %f mm", zSlice * 1e3f);
+
+			ImGui::SliderFloat("zStretch", &zStretch, 1, 5);
+			ImGui::SameLine();
+			HelpMarker("Stretching along z makes it easier to interpret the content of the angiograms.");
+
+			ImGui::Columns(2);
+			ImGui::Text("Current z layer [mm]");
+			ImGui::NextColumn();
+			ImGui::Text("%f", zSlice * 1e3f);
+			ImGui::NextColumn();
+			ImGui::Columns(1);
+
 			ImImagesc(absMat->get_psliceZ((uint64_t) absSliceZ),
 				absMat->get_dim(0), absMat->get_dim(1), &absDataTexture, absDataMapper);
 			
-			int width = 550;
+			const int width = 550;
 			int height = (float) width / absMat->get_length(0) * absMat->get_length(1);
 			ImGui::Image((void*)(intptr_t)absDataTexture, ImVec2(width, height));
 			
-			ImGui::SliderInt("xSlice", &absSliceY, 0, absMat->get_dim(0) - 1);
+			ImGui::SliderInt("ySlice", &absSliceY, 0, absMat->get_dim(1) - 1);
 
 			ImImagesc(absMat->get_psliceY((uint64_t) absSliceY),
 			 	absMat->get_dim(0), absMat->get_dim(2), &absDataTextureSlice, absDataMapper);
-			height = (float) width / absMat->get_length(0) * absMat->get_length(2);
+			height = (float) width / absMat->get_length(0) * absMat->get_length(2) * zStretch;
 			ImGui::Image((void*)(intptr_t)absDataTextureSlice, ImVec2(width, height));
 			
 			ImGui::SliderFloat("MinVal", absDataMapper.get_pminVal(), 
-				absMat->get_minVal(), absMat->get_maxVal(), "%.1f");
+				absMat->get_minVal(), absMat->get_maxVal(), "%.4f");
 			ImGui::SliderFloat("MaxVal", absDataMapper.get_pmaxVal(), 
-				absMat->get_minVal(), absMat->get_maxVal(), "%.1f");
+				absMat->get_minVal(), absMat->get_maxVal(), "%.4f");
 			ImGui::ColorEdit4("Min color", absDataMapper.get_pminCol(), 
 				ImGuiColorEditFlags_Float);
 			ImGui::ColorEdit4("Max color", absDataMapper.get_pmaxCol(), 
@@ -790,7 +879,14 @@ void gui::ReconPreview()
 
 		if (ImGui::CollapsingHeader("Export"))
 		{
+			// TODO: this needs to be done, lets specify file name and folder path separaely
+			ImGui::InputText("Output path", &exportPath);
+			ImGui::InputText("Output name", &fileName);
 
+			if (ImGui::Button("Export"))
+			{
+				absMat->saveToFile(exportPath + fileName);
+			}
 		}
 
 		ImGui::End();

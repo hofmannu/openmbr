@@ -3,7 +3,9 @@ cmake_policy(SET CMP0079 NEW)
 
 # clean imgui libraries
 add_library(ImGui imgui/imgui.cpp)
-target_link_libraries(ImGui PUBLIC ImGuiWidgets ImGuiTables) 
+target_link_libraries(ImGui PUBLIC ImGuiWidgets ImGuiTables)
+
+add_library(ImGuiStdlib imgui/misc/cpp/imgui_stdlib.cpp)
 
 add_library(ImGuiWidgets imgui/imgui_widgets.cpp)
 target_link_libraries(ImGuiWidgets PUBLIC ImGuiDraw)

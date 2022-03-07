@@ -13,6 +13,8 @@
 
 
 #include "../lib/imgui/imgui.h"
+#include "../lib/imgui/misc/cpp/imgui_stdlib.h"
+
 #include "imgui_impl_sdl.h"
 #include "imgui_impl_opengl3.h"
 #include "ImGuiFileDialog.h"
@@ -86,6 +88,10 @@ private:
 	color_mapper absDataMapper;
 	GLuint absDataTexture;
 	GLuint absDataTextureSlice;
+	float zStretch = 3.0f;
+
+	std::string exportPath{"~/"}; // folder to which we want to export
+	std::string fileName{"export.h5"}; // file name to which we want to export
 
 	std::thread reconThread; // separate thread in which we will run the reconstruction
 	bool canRecon();

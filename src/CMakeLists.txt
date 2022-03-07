@@ -42,6 +42,7 @@ target_link_libraries(Gui PUBLIC
 	ImGuiImplSdl 
 	ImGuiImplOpenGL3
 	ImGuiFileDialog
+	ImGuiStdlib
 	Recon
 	Volume
 	ColorMapper

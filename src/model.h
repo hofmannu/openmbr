@@ -30,11 +30,15 @@ private:
 	float origin[4] = {0.0, -1e-3, -1e-3, -1e-3}; // origin of model vectot [t0, x0, y0, z0]
 	uint64_t dim[4] = {200, 101, 101, 101}; // size of model matrix: [nt, nx, ny, nz]
 	bool isLoaded = 0; // is model loaded?
-	string filePath; // from where do we load the model
 	float minVal = 0;
 	float maxVal = 0;
 
+	string filePath; // from where do we load the model
+	string folderPath; // path where our file is located
+	string fileName; // name of the file in the target location
+
 	void alloc_model();
+	void set_filePath(const string _filePath);
 
 public:
 
@@ -97,7 +101,12 @@ public:
 	inline float get_maxVal() const {return maxVal;};
 
 	bool get_isLoaded() const {return isLoaded;};
+	
 	const char* get_filePath() const {return filePath.c_str();};
+	const char* get_folderPath() const {return folderPath.c_str();};
+	const char* get_fileName() const {return fileName.c_str();};
+	
+	float get_memory() const; // return the memory of the matrix in bytes
 
 	void print_information();
 
